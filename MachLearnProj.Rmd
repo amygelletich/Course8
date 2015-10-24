@@ -1,0 +1,104 @@
+---
+title: "MachLearnProj"
+author: "Amy"
+date: "October 24, 2015"
+output: html_document
+---
+
+Six young health participants were asked to perform one set of 10 repetitions of 
+the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according 
+to the specification (Class A), throwing the elbows to the front (Class B), 
+lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway 
+(Class D) and throwing the hips to the front (Class E). Class A corresponds to the 
+specified execution of the exercise, while the other 4 classes correspond to 
+common mistakes. 
+
+The goal of your project is to predict the manner in which they did the exercise. 
+This is the "classe" variable in the training set. You may use any of the other 
+variables to predict with. You should create a report describing how you built 
+your model, how you used cross validation, what you think the expected out of 
+sample error is, and why you made the choices you did. You will also use your 
+prediction model to predict 20 different test cases. 
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. 
+Qualitative Activity Recognition of Weight Lifting Exercises. 
+Proceedings of 4th International Conference in Cooperation with SIGCHI 
+(Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+```{r}
+library(caret)
+library(AppliedPredictiveModeling)
+library(randomForest)
+library(e1071) #Error in requireNamespaceQuietStop("e1071") : package e1071 is required
+```
+
+Download and read-in the training and testing data
+```{r}
+# download and read in the training and testing data
+url1<-"http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+trainDat <- read.csv(url(url1), na.strings=c("NA","#DIV/0!",""))
+url2<-"http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+testDat <- read.csv(url(url2), na.strings=c("NA","#DIV/0!",""))
+```
+
+Remove NA's and variables that will not aid in prediction (id's, timestamps, etc)
+```{r}
+naVector <-vector()
+for(i in 1:length(trainDat)) { 
+  if(any(is.na(trainDat[, i]))) {
+    naVector<-c(naVector,i)
+  }
+}
+trainDat<-trainDat[,-naVector]
+
+trainDat<-trainDat[,-c(1:7)]
+```
+
+Set the seed and divide the dataset into 3 so we can have test, train & validation sets
+```{r}
+#Set seed
+set.seed(1000) 
+
+#First divide
+inTrain <- createDataPartition(trainDat$classe, p=0.6, list=FALSE)
+myTrain <- trainDat[inTrain, ]
+crossVal <- trainDat[-inTrain,]
+
+#Second divide
+inTrain <- createDataPartition(crossVal$classe, p = 0.5, list=FALSE)
+myTest<-crossVal[-inTrain,]
+crossVal<-crossVal[inTrain,]
+
+dim(myTrain);dim(myTest);dim(crossVal)
+
+```
+
+
+At the recommendation of the discussion forums, using random forests with cross
+- validation for model.
+```{r}
+randForFit <- randomForest(classe ~. , data=myTrain)
+
+# Final Model
+randForPred <- predict(randForFit, crossVal)
+confusionMatrix(randForPred, crossVal$classe)
+```
+Then predict model on test dataset.
+```{r}
+randForPred2 <- predict(randForFit, myTest)
+confusionMatrix(myTest$classe, randForPred2)
+```
+
+Out of sample error is 5.6%.
+```{r}
+error <- 1 - as.numeric(confusionMatrix(myTest$classe, randForPred2)$overall[1])
+```
+
+Use rplot.plot package to view decision tree visualization
+```{r}
+library(rpart)
+library(rpart.plot)
+treeModel <- rpart(classe ~ ., data=myTrain, method="class")
+prp(treeModel) # plot of Tree Model
+```
+
